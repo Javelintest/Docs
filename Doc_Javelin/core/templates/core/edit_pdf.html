@@ -1,0 +1,418 @@
+{% extends "core/base.html" %}
+
+{% block title %}Edit PDF - Doc Javelin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .editor-container {
+        display: none;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .toolbar {
+        position: sticky;
+        top: 80px;
+        z-index: 100;
+        background: white;
+        padding: 16px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        margin-bottom: 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 1px solid var(--border);
+    }
+
+    .toolbar-actions {
+        display: flex;
+        gap: 12px;
+    }
+
+    .grid-area {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 24px;
+        margin-bottom: 40px;
+        min-height: 200px;
+    }
+
+    .page-card {
+        background: white;
+        border-radius: 8px;
+        padding: 10px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        position: relative;
+        cursor: grab;
+        transition: transform 0.2s, box-shadow 0.2s;
+        display: flex;
+        flex-direction: column;
+        user-select: none;
+    }
+
+    .page-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+
+    .page-card.sortable-ghost {
+        opacity: 0.4;
+    }
+
+    .preview-canvas-wrapper {
+        width: 100%;
+        height: 240px;
+        background: #f3f4f6;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+
+    .preview-canvas-wrapper canvas {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        transition: transform 0.3s ease;
+    }
+
+    .page-number {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--gray);
+        text-align: center;
+    }
+
+    .card-actions {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        display: flex;
+        gap: 4px;
+        z-index: 10;
+    }
+
+    .action-btn {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: none;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 14px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        transition: transform 0.2s;
+    }
+
+    .action-btn:hover {
+        transform: scale(1.1);
+    }
+
+    .rotate-btn { background: var(--primary); }
+    .delete-btn { background: var(--danger); }
+
+    .page-header {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        padding: 60px 20px;
+        text-align: center;
+        color: white;
+        margin-bottom: 40px;
+    }
+    
+    .page-header h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 12px; }
+    .page-content { max-width: 1200px; margin: 0 auto; padding: 0 20px 60px; }
+
+    .btn-outline {
+        background: white;
+        border: 2px solid var(--border);
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--dark);
+    }
+
+    .btn-outline:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    .tips-card {
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        border-left: 4px solid var(--primary);
+        margin-top: 40px;
+        max-width: 900px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .tips-card h3 { color: var(--primary); margin-bottom: 16px; font-weight: 700; }
+    .tips-card ul { list-style: none; padding: 0; }
+    .tips-card li { padding: 8px 0 8px 28px; position: relative; }
+    .tips-card li::before { content: '✓'; position: absolute; left: 0; color: var(--success); font-weight: bold; }
+</style>
+<!-- Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>✏️ Edit PDF</h1>
+    <p>Reorder, rotate, or remove pages from your PDF document</p>
+</div>
+
+<div class="page-content">
+    
+    <!-- Upload State -->
+    <div class="card" id="upload-panel" style="max-width: 900px; margin: 0 auto;">
+        <p style="margin-bottom: 32px; font-size: 1.1rem; text-align: center;">Upload a PDF to start editing. You can rearrange pages, rotate them, or delete unwanted pages.</p>
+        
+        <div class="file-upload" id="edit-upload">
+            <label for="edit-file" class="file-upload-label">
+                <span class="file-upload-icon">📁</span>
+                <span>Click to select PDF or drag and drop</span>
+            </label>
+            <input type="file" id="edit-file" accept=".pdf">
+        </div>
+    </div>
+
+    <!-- Editor State -->
+    <div class="editor-container" id="editor-panel">
+        <div class="toolbar">
+            <div style="font-weight: 600; font-size: 1.1rem;">
+                <span id="page-count">0</span> Pages
+            </div>
+            <div class="toolbar-actions">
+                <button class="btn-outline" onclick="resetEditor()">Cancel</button>
+                <button class="btn" style="width: auto; padding: 10px 32px;" onclick="saveChanges()">Save Changes</button>
+            </div>
+        </div>
+
+        <div class="grid-area" id="pages-grid"></div>
+    </div>
+
+    <!-- Loading & Messages -->
+    <div class="loading" id="edit-loading">
+        <div class="spinner"></div>
+        <p id="loading-text">Processing PDF...</p>
+    </div>
+    
+    <div class="message" id="edit-message" style="max-width: 900px; margin: 20px auto 0;"></div>
+
+    <!-- Tips -->
+    <div class="card tips-card">
+        <h3>💡 Pro Tips</h3>
+        <ul>
+            <li>Drag and drop pages to reorder them</li>
+            <li>Use the rotate button ⟳ to fix orientation</li>
+            <li>Click the delete button × to remove unwanted pages</li>
+            <li>Changes are applied when you click "Save Changes"</li>
+            <li>Large files may take a moment to load previews</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentFile = null;
+    let pdfDoc = null;
+    let pages = []; // { id, originalIndex, rotation: 0 }
+    
+    const uploadPanel = document.getElementById('upload-panel');
+    const editorPanel = document.getElementById('editor-panel');
+    const gridEl = document.getElementById('pages-grid');
+    const fileInput = document.getElementById('edit-file');
+    const uploadArea = document.getElementById('edit-upload');
+
+    // Sortable
+    new Sortable(gridEl, {
+        animation: 150,
+        ghostClass: 'sortable-ghost'
+    });
+
+    // Upload Handlers
+    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', (e) => {
+        if(e.target.files.length) handleFile(e.target.files[0]);
+    });
+
+    async function handleFile(file) {
+        if (file.type !== 'application/pdf') {
+            alert('Please upload a valid PDF file.');
+            return;
+        }
+
+        currentFile = file;
+        uploadPanel.style.display = 'none';
+        
+        // Show loading
+        document.getElementById('edit-loading').style.display = 'block';
+        document.getElementById('loading-text').innerText = 'Loading pages...';
+
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
+            
+            await renderGrid();
+            
+            document.getElementById('edit-loading').style.display = 'none';
+            editorPanel.style.display = 'block';
+            document.getElementById('page-count').innerText = pdfDoc.numPages;
+        } catch (err) {
+            console.error(err);
+            alert('Error loading PDF: ' + err.message);
+            resetEditor();
+        }
+    }
+
+    async function renderGrid() {
+        gridEl.innerHTML = '';
+        pages = [];
+
+        for (let i = 1; i <= pdfDoc.numPages; i++) {
+            const pageId = `page-${i}`;
+            pages.push({ id: pageId, originalIndex: i - 1, rotation: 0 });
+
+            const card = document.createElement('div');
+            card.className = 'page-card';
+            card.dataset.id = pageId;
+            card.innerHTML = `
+                <div class="card-actions">
+                    <button class="action-btn rotate-btn" onclick="rotatePage('${pageId}')" title="Rotate">⟳</button>
+                    <button class="action-btn delete-btn" onclick="deletePage('${pageId}')" title="Delete">×</button>
+                </div>
+                <div class="preview-canvas-wrapper">
+                    <canvas id="canvas-${pageId}"></canvas>
+                </div>
+                <div class="page-number">Page ${i}</div>
+            `;
+            gridEl.appendChild(card);
+
+            // Render thumbnail
+            renderThumbnail(i, `canvas-${pageId}`);
+        }
+    }
+
+    async function renderThumbnail(pageApparentNum, canvasId) {
+        try {
+            const page = await pdfDoc.getPage(pageApparentNum);
+            const canvas = document.getElementById(canvasId);
+            const context = canvas.getContext('2d');
+            
+            const viewport = page.getViewport({ scale: 0.4 });
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            await page.render({ canvasContext: context, viewport }).promise;
+        } catch(e) {
+            console.error(e);
+        }
+    }
+
+    window.rotatePage = function(pageId) {
+        const pageObj = pages.find(p => p.id === pageId);
+        if(pageObj) {
+            pageObj.rotation = (pageObj.rotation + 90) % 360;
+            const canvas = document.querySelector(`#canvas-${pageId}`);
+            canvas.style.transform = `rotate(${pageObj.rotation}deg)`;
+            
+            // Adjust container if needed (simple CSS rotation doesn't reflow layout, which is fine for visual)
+        }
+    };
+
+    window.deletePage = function(pageId) {
+        const index = pages.findIndex(p => p.id === pageId);
+        if(index > -1) {
+            pages.splice(index, 1);
+            document.querySelector(`.page-card[data-id="${pageId}"]`).remove();
+            document.getElementById('page-count').innerText = pages.length;
+        }
+    };
+
+    window.resetEditor = function() {
+        currentFile = null;
+        pdfDoc = null;
+        pages = [];
+        gridEl.innerHTML = '';
+        editorPanel.style.display = 'none';
+        uploadPanel.style.display = 'block';
+        document.getElementById('edit-loading').style.display = 'none';
+        document.getElementById('edit-message').style.display = 'none';
+        fileInput.value = '';
+    };
+
+    window.saveChanges = async function() {
+        if (!currentFile || pages.length === 0) return;
+
+        // Construct config based on DOM order
+        const cards = Array.from(gridEl.querySelectorAll('.page-card'));
+        const config = cards.map(card => {
+            const id = card.dataset.id;
+            const pageObj = pages.find(p => p.id === id);
+            return {
+                index: pageObj.originalIndex,
+                rotate: pageObj.rotation
+            };
+        });
+
+        const formData = new FormData();
+        formData.append('file', currentFile);
+        formData.append('pages_config', JSON.stringify(config));
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        
+        document.getElementById('edit-loading').style.display = 'block';
+        document.getElementById('loading-text').innerText = 'Saving changes...';
+        editorPanel.style.display = 'none';
+        document.getElementById('edit-message').style.display = 'none';
+
+        try {
+            const response = await fetch("{% url 'edit_pdf' %}", {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            });
+            
+            const data = await response.json();
+            document.getElementById('edit-loading').style.display = 'none';
+            const msgEl = document.getElementById('edit-message');
+            msgEl.style.display = 'block';
+
+            if (data.success && data.task_id) {
+                window.location.href = `/result/${data.task_id}`;
+            } else if (data.success) {
+                const downloadUrl = data.url || `/download/${data.filename}`;
+                msgEl.className = 'message success';
+                msgEl.innerHTML = `${data.message} | <a href="${downloadUrl}" class="download-link">⬇️ Download Edited PDF</a>
+                                   <div style="margin-top:16px"><button class="btn" onclick="resetEditor()" style="width: auto;">Edit Another</button></div>`;
+            } else {
+                msgEl.className = 'message error';
+                msgEl.innerHTML = data.error || 'Failed to save changes.';
+                // Show editor again on error?
+                editorPanel.style.display = 'block';
+            }
+        } catch (err) {
+            document.getElementById('edit-loading').style.display = 'none';
+            alert('Error: ' + err.message);
+            editorPanel.style.display = 'block';
+        }
+    };
+</script>
+{% endblock %}

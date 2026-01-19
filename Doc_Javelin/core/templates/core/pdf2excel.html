@@ -1,0 +1,239 @@
+{% extends "core/base.html" %}
+
+{% block title %}PDF to Excel - Doc Javelin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        padding: 60px 20px;
+        text-align: center;
+        color: white;
+        margin-bottom: 40px;
+    }
+
+    .page-header h1 {
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin-bottom: 12px;
+    }
+
+    .page-header p {
+        font-size: 1.1rem;
+        opacity: 0.95;
+    }
+
+    .page-content {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 0 20px 60px;
+    }
+
+    .tips-card {
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        border-left: 4px solid var(--primary);
+    }
+
+    .tips-card h3 {
+        color: var(--primary);
+        margin-bottom: 16px;
+        font-size: 1.3rem;
+        font-weight: 700;
+    }
+
+    .tips-card ul {
+        list-style: none;
+        padding: 0;
+    }
+
+    .tips-card li {
+        padding: 8px 0;
+        padding-left: 28px;
+        position: relative;
+        color: var(--dark);
+        line-height: 1.7;
+    }
+
+    .tips-card li::before {
+        content: '✓';
+        position: absolute;
+        left: 0;
+        color: var(--success);
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📊 PDF to Excel</h1>
+    <p>Extract tables and data from PDFs into Excel spreadsheets</p>
+</div>
+
+<div class="page-content">
+    <div class="card">
+        <p style="margin-bottom: 32px; font-size: 1.1rem;">Extract tables and data from PDF files and convert them to Excel spreadsheets (.xlsx format). Perfect for data analysis and manipulation.</p>
+        
+        <div class="file-upload" id="pdf2excel-upload">
+            <label for="pdf2excel-file" class="file-upload-label">
+                <span class="file-upload-icon">📁</span>
+                <span>Click to select PDF file or drag and drop</span>
+                <span style="font-size: 0.9rem; font-weight: 400; opacity: 0.7;">Maximum file size: 100MB</span>
+            </label>
+            <input type="file" id="pdf2excel-file" accept=".pdf">
+        </div>
+        
+        <div class="file-list" id="pdf2excel-file-list"></div>
+        
+        <button class="btn" onclick="pdfToExcel()">Convert to Excel</button>
+        
+        <div class="loading" id="pdf2excel-loading">
+            <div class="spinner"></div>
+            <p>Extracting tables and converting to Excel...</p>
+        </div>
+        
+        <div class="message" id="pdf2excel-message"></div>
+    </div>
+
+    <div class="card tips-card">
+        <h3>💡 Pro Tips</h3>
+        <ul>
+            <li>Works best with PDFs that contain structured tables</li>
+            <li>Simple, text-based tables convert more accurately</li>
+            <li>Complex layouts may require manual adjustment after conversion</li>
+            <li>Multiple tables will be placed on separate Excel sheets</li>
+            <li>Column alignment and formatting may need tweaking</li>
+            <li>For best results, ensure tables are clearly defined in the PDF</li>
+            <li>Your files are automatically deleted after processing for security</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const uploadArea = document.getElementById('pdf2excel-upload');
+    const fileInput = document.getElementById('pdf2excel-file');
+
+    // Drag and drop functionality
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, () => uploadArea.classList.add('dragover'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, () => uploadArea.classList.remove('dragover'), false);
+    });
+
+    uploadArea.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            displayFiles(files, 'pdf2excel-file-list');
+        }
+    }
+
+    fileInput.addEventListener('change', function(e) {
+        displayFiles(e.target.files, 'pdf2excel-file-list');
+    });
+
+    uploadArea.addEventListener('click', () => fileInput.click());
+
+    async function pdfToExcel() {
+        const file = fileInput.files[0];
+        if (!file) {
+            showMessage('pdf2excel-message', 'Please select a PDF file', 'error');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // Get CSRF Token
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        showLoading('pdf2excel-loading', true);
+        hideMessage('pdf2excel-message');
+        document.querySelector('.btn').disabled = true;
+
+        try {
+            const response = await fetch("{% url 'pdf2excel' %}", {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            });
+
+            const data = await response.json();
+            showLoading('pdf2excel-loading', false);
+            document.querySelector('.btn').disabled = false;
+
+            if (data.success && data.task_id) {
+                window.location.href = `/result/${data.task_id}`;
+            } else if (data.success) {
+                const downloadUrl = data.url || `/download/${data.filename}`;
+                showMessage('pdf2excel-message', 
+                    `${data.message} | <a href="${downloadUrl}" class="download-link">⬇️ Download Excel File</a>`, 
+                    'success');
+            } else {
+                showMessage('pdf2excel-message', data.error || 'Failed to convert PDF. Please try again.', 'error');
+            }
+        } catch (error) {
+            showLoading('pdf2excel-loading', false);
+            document.querySelector('.btn').disabled = false;
+            showMessage('pdf2excel-message', 'Error: ' + error.message, 'error');
+        }
+    }
+
+    function displayFiles(files, containerId) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        
+        if (files.length > 0) {
+            Array.from(files).forEach((file) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                const fileSize = (file.size / 1024 / 1024).toFixed(2);
+                fileItem.innerHTML = `
+                    <span>📄 ${file.name} <span style="color: var(--gray); font-size: 0.9rem;">(${fileSize} MB)</span></span>
+                    <button onclick="removeFile('${containerId}')">Remove</button>
+                `;
+                container.appendChild(fileItem);
+            });
+        }
+    }
+
+    function removeFile(containerId) {
+        fileInput.value = '';
+        document.getElementById(containerId).innerHTML = '';
+    }
+
+    function showLoading(id, show) {
+        document.getElementById(id).style.display = show ? 'block' : 'none';
+    }
+
+    function showMessage(id, message, type) {
+        const msgEl = document.getElementById(id);
+        msgEl.className = `message ${type}`;
+        msgEl.innerHTML = message;
+        msgEl.style.display = 'block';
+    }
+
+    function hideMessage(id) {
+        document.getElementById(id).style.display = 'none';
+    }
+</script>
+{% endblock %}

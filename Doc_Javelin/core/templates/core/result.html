@@ -1,0 +1,203 @@
+{% extends "core/base.html" %}
+
+{% block title %}Download Your File - Doc Javelin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .result-container {
+        max-width: 800px;
+        margin: 60px auto;
+        text-align: center;
+        padding: 0 20px;
+    }
+
+    .success-icon {
+        width: 80px;
+        height: 80px;
+        background: #d1fae5;
+        color: #059669;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 40px;
+        margin: 0 auto 32px;
+        box-shadow: 0 0 0 10px #ecfdf5;
+        animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes popIn {
+        from { transform: scale(0); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+
+    .file-card {
+        background: white;
+        border-radius: 16px;
+        padding: 40px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        border: 1px solid var(--border);
+        margin-bottom: 40px;
+        text-align: center;
+    }
+
+    .file-name {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--dark);
+        margin-bottom: 8px;
+        word-break: break-all;
+    }
+
+    .file-info {
+        color: var(--gray);
+        font-size: 0.95rem;
+        margin-bottom: 32px;
+    }
+
+    .btn-download {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        color: white;
+        text-decoration: none;
+        padding: 16px 48px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 1.2rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+        transition: all 0.3s ease;
+    }
+
+    .btn-download:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+    }
+
+    .action-links {
+        display: flex;
+        justify-content: center;
+        gap: 24px;
+        margin-top: 40px;
+    }
+
+    .secondary-link {
+        color: var(--gray);
+        text-decoration: none;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: color 0.2s;
+    }
+
+    .secondary-link:hover {
+        color: var(--primary);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="result-container">
+    <div class="success-icon">✓</div>
+    
+    <h1 style="font-size: 2.5rem; margin-bottom: 16px; font-weight: 800;">Your file is ready!</h1>
+    <p style="font-size: 1.1rem; color: var(--gray); margin-bottom: 48px;">
+        Successfully processed using <strong>{{ task_name }}</strong>
+    </p>
+
+    <div class="file-card">
+        <label for="filename-input" style="display: block; margin-bottom: 8px; color: var(--gray); font-size: 0.9rem;">Filename</label>
+        <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 24px;">
+            <input type="text" id="filename-input" value="{{ filename }}" 
+                   style="padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; width: 300px; text-align: center;">
+        </div>
+        
+        <div style="display: flex; gap: 16px; justify-content: center;">
+            <a href="/download/{{ filename }}" id="download-btn" class="btn-download" target="_blank">
+                <span>⬇️</span> Download File
+            </a>
+            <button id="preview-btn" class="btn-download" style="background: white; color: var(--primary); border: 2px solid var(--primary); box-shadow: none;">
+                <span>👁️</span> Preview
+            </button>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="preview-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center;">
+        <div style="background: white; width: 90%; height: 90%; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; position: relative;">
+            <div style="padding: 16px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+                <h3 style="margin: 0; color: var(--dark);">File Preview</h3>
+                <button onclick="closePreview()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray);">&times;</button>
+            </div>
+            <iframe id="preview-frame" style="flex: 1; border: none; width: 100%; height: 100%;" src=""></iframe>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const input = document.getElementById('filename-input');
+            const downloadLink = document.getElementById('download-btn');
+            const previewBtn = document.getElementById('preview-btn');
+            const modal = document.getElementById('preview-modal');
+            const frame = document.getElementById('preview-frame');
+            const originalFilename = "{{ filename }}";
+            
+            function getDownloadUrl(preview = false) {
+                const newName = input.value.trim();
+                const baseUrl = `/download/${originalFilename}`;
+                const url = new URL(baseUrl, window.location.origin);
+                
+                if (newName && newName !== originalFilename) {
+                    url.searchParams.set('name', newName);
+                }
+                
+                if (preview) {
+                    url.searchParams.set('preview', 'true');
+                }
+                return url.toString();
+            }
+
+            function updateLink() {
+                downloadLink.href = getDownloadUrl(false);
+            }
+            
+            input.addEventListener('input', updateLink);
+
+            previewBtn.addEventListener('click', function() {
+                frame.src = getDownloadUrl(true);
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+            });
+
+            window.closePreview = function() {
+                modal.style.display = 'none';
+                frame.src = '';
+                document.body.style.overflow = 'auto';
+            };
+            
+            // Close on click outside
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closePreview();
+            });
+            
+            // Close on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && modal.style.display === 'flex') {
+                    closePreview();
+                }
+            });
+        });
+    </script>
+
+    <div class="action-links">
+        <a href="{{ restart_url }}" class="secondary-link">
+            <span>↺</span> Process another file
+        </a>
+        <a href="/" class="secondary-link">
+            <span>🏠</span> Go to Home
+        </a>
+    </div>
+</div>
+{% endblock %}
