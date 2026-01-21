@@ -24,16 +24,35 @@ def edit_pdf(input_path, output_path, pages_config):
         
         total_pages = len(reader.pages)
         
-        for page_cfg in pages_config:
-            original_index = int(page_cfg.get('index'))
+        # If config is empty, assume we want all pages (maybe just for a passthrough or verification)
+        if not pages_config:
+            # Copy all pages if no config
+            for i in range(total_pages):
+                writer.add_page(reader.pages[i])
+        else:
+            # 1. Map config by page number (1-based from frontend) to internal 0-based index
+            # The frontend sends a list of changes for specific pages. 
+            # Pages NOT in the config should be included as-is (unless we only want to keep selected?)
+            # Wait, the current logic assumes `pages_config` IS the new order.
+            # BUT the frontend only sends changes for specific pages (rotate/delete).
+            # We need to iterate through ALL original pages and apply changes or skip if deleted.
             
-            if 0 <= original_index < total_pages:
-                page = reader.pages[original_index]
+            # Create a lookup map for changes: page_num (1-based) -> config
+            changes_map = { int(cfg['pageNum']): cfg for cfg in pages_config }
+            
+            for i in range(total_pages):
+                page_num = i + 1 # 1-based
+                cfg = changes_map.get(page_num)
                 
-                # Apply rotation if specified
-                rotation = int(page_cfg.get('rotate', 0))
-                if rotation % 90 == 0 and rotation != 0:
-                    page.rotate(rotation)
+                if cfg and cfg.get('deleted') == True:
+                    continue # Skip deleted pages
+                
+                page = reader.pages[i]
+                
+                if cfg:
+                    rotation = int(cfg.get('rotation', 0))
+                    if rotation != 0:
+                        page.rotate(rotation)
                 
                 writer.add_page(page)
         

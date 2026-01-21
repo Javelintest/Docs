@@ -9,6 +9,7 @@ import MergeScreen from './src/screens/MergeScreen';
 import Img2PdfScreen from './src/screens/Img2PdfScreen';
 import Pdf2WordScreen from './src/screens/Pdf2WordScreen';
 import Pdf2ExcelScreen from './src/screens/Pdf2ExcelScreen';
+import CompressScreen from './src/screens/CompressScreen';
 import EditPdfScreen from './src/screens/EditPdfScreen';
 
 const Stack = createStackNavigator();
@@ -34,6 +35,7 @@ export default function App() {
         <Stack.Screen name="Img2Pdf" component={Img2PdfScreen} options={{ title: 'Images to PDF' }} />
         <Stack.Screen name="Pdf2Word" component={Pdf2WordScreen} options={{ title: 'PDF to Word' }} />
         <Stack.Screen name="Pdf2Excel" component={Pdf2ExcelScreen} options={{ title: 'PDF to Excel' }} />
+        <Stack.Screen name="Compress" component={CompressScreen} options={{ title: 'Compress PDF' }} />
         <Stack.Screen name="EditPdf" component={EditPdfScreen} options={{ title: 'Edit PDF' }} />
       </Stack.Navigator>
     </NavigationContainer>

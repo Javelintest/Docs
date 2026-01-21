@@ -1,0 +1,236 @@
+{% extends "core/base.html" %}
+
+{% block title %}Compress PDF - Doc Javelin{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="tool-header text-center mb-5">
+                <div class="icon-wrapper mb-3">
+                    <span style="font-size: 3rem;">📉</span>
+                </div>
+                <h1 class="display-5 fw-bold mb-3">Compress PDF</h1>
+                <p class="lead text-muted">Reduce the file size of your PDF documents while maintaining quality.</p>
+            </div>
+
+            <div class="card shadow-lg border-0 rounded-4">
+                <div class="card-body p-5">
+                    <form id="compressForm" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="upload-area mb-4" id="dropZone">
+                            <input type="file" name="file" id="fileInput" class="file-input" accept=".pdf" required>
+                            <div class="upload-content text-center p-5">
+                                <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                                <h4>Drop PDF here</h4>
+                                <p class="text-muted">or click to browse</p>
+                            </div>
+                        </div>
+
+                        <!-- Selected File Preview -->
+                        <div id="filePreview" class="mb-4 d-none">
+                            <div class="d-flex align-items-center p-3 bg-light rounded-3">
+                                <i class="fas fa-file-pdf text-danger fa-2x me-3"></i>
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-0" id="filename">filename.pdf</h6>
+                                    <small class="text-muted" id="filesize">0 KB</small>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-danger" id="removeFile">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg py-3 rounded-3" id="submitBtn" disabled>
+                                <span class="normal-text">Compress PDF</span>
+                                <span class="loading-text d-none">
+                                    <span class="spinner-border spinner-border-sm me-2"></span>Processing...
+                                </span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Features -->
+            <div class="row mt-5 text-center">
+                <div class="col-md-4">
+                    <div class="p-3">
+                        <i class="fas fa-search-plus fa-2x text-primary mb-3"></i>
+                        <h5>Smart Optimization</h5>
+                        <p class="text-muted small">Removes unused objects and redundancy.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="p-3">
+                        <i class="fas fa-shield-alt fa-2x text-primary mb-3"></i>
+                        <h5>Secure</h5>
+                        <p class="text-muted small">Files are deleted after processing.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="p-3">
+                        <i class="fas fa-bolt fa-2x text-primary mb-3"></i>
+                        <h5>Fast</h5>
+                        <p class="text-muted small">Optimized algorithms for quick results.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const filePreview = document.getElementById('filePreview');
+    const filenameDisplay = document.getElementById('filename');
+    const filesizeDisplay = document.getElementById('filesize');
+    const removeBtn = document.getElementById('removeFile');
+    const submitBtn = document.getElementById('submitBtn');
+    const form = document.getElementById('compressForm');
+
+    // Drag and drop handlers
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, unhighlight, false);
+    });
+
+    function highlight(e) {
+        dropZone.classList.add('border-primary');
+        dropZone.style.backgroundColor = '#f8f9fa';
+    }
+
+    function unhighlight(e) {
+        dropZone.classList.remove('border-primary');
+        dropZone.style.backgroundColor = '';
+    }
+
+    dropZone.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFiles(files);
+    }
+
+    fileInput.addEventListener('change', function() {
+        handleFiles(this.files);
+    });
+
+    function handleFiles(files) {
+        if (files.length > 0) {
+            const file = files[0];
+            if (file.type !== 'application/pdf') {
+                alert('Please upload a PDF file');
+                return;
+            }
+
+            // Update UI
+            filenameDisplay.textContent = file.name;
+            filesizeDisplay.textContent = formatBytes(file.size);
+            filePreview.classList.remove('d-none');
+            dropZone.classList.add('d-none');
+            submitBtn.disabled = false;
+            
+            // Assign to input if dropped
+            if (fileInput.files.length === 0) {
+                 const container = new DataTransfer();
+                 container.items.add(file);
+                 fileInput.files = container.files;
+            }
+        }
+    }
+
+    removeBtn.addEventListener('click', function() {
+        fileInput.value = '';
+        filePreview.classList.add('d-none');
+        dropZone.classList.remove('d-none');
+        submitBtn.disabled = true;
+    });
+
+    function formatBytes(bytes, decimals = 2) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const normalText = submitBtn.querySelector('.normal-text');
+        const loadingText = submitBtn.querySelector('.loading-text');
+        
+        submitBtn.disabled = true;
+        normalText.classList.add('d-none');
+        loadingText.classList.remove('d-none');
+
+        const formData = new FormData(this);
+
+        try {
+            const response = await fetch('/api/compress', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                window.location.href = `/result/${data.task_id}`;
+            } else {
+                alert(data.error || 'Compression failed');
+                submitBtn.disabled = false;
+                normalText.classList.remove('d-none');
+                loadingText.classList.add('d-none');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('An error occurred. Please try again.');
+            submitBtn.disabled = false;
+            normalText.classList.remove('d-none');
+            loadingText.classList.add('d-none');
+        }
+    });
+});
+</script>
+
+<style>
+.upload-area {
+    border: 2px dashed #dee2e6;
+    border-radius: 10px;
+    position: relative;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+.file-input {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+</style>
+{% endblock %}

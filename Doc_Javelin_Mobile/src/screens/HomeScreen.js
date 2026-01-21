@@ -7,6 +7,7 @@ const tools = [
   { id: 'img2pdf', title: 'Image to PDF', icon: 'images-outline', color: '#10B981', route: 'Img2Pdf' },
   { id: 'pdf2word', title: 'PDF to Word', icon: 'document-text-outline', color: '#F59E0B', route: 'Pdf2Word' },
   { id: 'pdf2excel', title: 'PDF to Excel', icon: 'grid-outline', color: '#14B8A6', route: 'Pdf2Excel' },
+  { id: 'compress', title: 'Compress PDF', icon: 'contract-outline', color: '#2563EB', route: 'Compress' },
   { id: 'edit', title: 'Edit PDF', icon: 'create-outline', color: '#EF4444', route: 'EditPdf' },
 ];
 

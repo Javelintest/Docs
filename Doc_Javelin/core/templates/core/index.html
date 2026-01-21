@@ -305,10 +305,21 @@
         </a>
         
         <!-- Placeholder for more tools in future -->
-        <div class="tool-card" style="border-style: dashed; justify-content: center; align-items: center; opacity: 0.6; cursor: default;">
-            <div style="font-size: 2rem; color: var(--gray); margin-bottom: 10px;">➕</div>
-            <h3 style="font-size: 1.1rem; color: var(--gray);">More coming soon</h3>
-        </div>
+        <!-- Edit PDF -->
+        <a href="{% url 'edit_pdf_page' %}" class="tool-card">
+            <div class="tool-icon-wrapper">✍️</div>
+            <h3 class="tool-name">Edit PDF</h3>
+            <p class="tool-desc">Rotate, rearrange, or delete pages from your PDF documents easily.</p>
+            <div class="tool-card-arrow">Try it now <span>→</span></div>
+        </a>
+
+        <!-- Compress PDF -->
+        <a href="{% url 'compress_page' %}" class="tool-card">
+            <div class="tool-icon-wrapper">📉</div>
+            <h3 class="tool-name">Compress PDF</h3>
+            <p class="tool-desc">Reduce the file size of your PDF while maintaining the best quality possible.</p>
+            <div class="tool-card-arrow">Try it now <span>→</span></div>
+        </a>
     </div>
 </div>
 

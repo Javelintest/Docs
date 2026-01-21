@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor Studio - Doc Javelin</title>
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/editor.css' %}">
+    <style>
+         :root {
+            /* Inherit Theme from Base */
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --primary-light: #60a5fa;
+            --secondary: #10b981;
+            --dark: #111827;
+            --gray: #6b7280;
+            --light-gray: #f8fafc;
+            --border: #e2e8f0;
+            --danger: #ef4444;
+        }
+        body { margin: 0; font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; }
+    </style>
+</head>
+<body>
+
+    <!-- Top Bar -->
+    <header class="editor-top-bar">
+        <div class="top-left">
+            <a href="/" class="back-home">←</a>
+            <div class="file-info">
+                <span class="tool-name" id="toolNameDisplay">{{ tool|title }}</span>
+                <span class="separator">/</span>
+                <span class="file-name" id="fileNameDisplay">{% if initial_files %}{{ initial_files.0.name }}{% else %}No File{% endif %}</span>
+            </div>
+        </div>
+        
+        <div class="top-center">
+            <button class="tool-btn" id="undoBtn" title="Undo">↩</button>
+            <button class="tool-btn" id="redoBtn" title="Redo">↪</button>
+        </div>
+        
+        <div class="top-right">
+            <button class="btn-text" id="resetBtn">Reset</button>
+            <button class="btn-close" onclick="window.location.href='/'">Exit</button>
+        </div>
+    </header>
+
+    <div class="editor-workspace">
+        <!-- Left Toolbar (Dynamic) -->
+        <aside class="editor-left-panel" id="leftPanel">
+            <!-- Icons injected by tools.js -->
+        </aside>
+
+        <!-- Main Canvas -->
+        <main class="editor-canvas" id="mainCanvas">
+             <div class="canvas-loader" id="canvasLoader" style="display:none;">Loading...</div>
+             <div id="canvasContent" class="canvas-content">
+                 <!-- Preview or Grid goes here -->
+                 <div class="placeholder-msg" id="uploadContainer">
+                     {% if initial_files %}
+                        <iframe src="{{ initial_files.0.url }}#toolbar=0" class="pdf-viewer-frame"></iframe>
+                     {% else %}
+                        <div class="upload-box" id="dropZone">
+                            <div class="upload-icon">📄</div>
+                            <h2>Select PDF files</h2>
+                            <p>or drag and drop them here</p>
+                            <input type="file" id="fileInput" multiple style="display:none">
+                            <button class="btn-primary" onclick="document.getElementById('fileInput').click()">Select Files</button>
+                        </div>
+                     {% endif %}
+                 </div>
+             </div>
+        </main>
+
+        <!-- Right Settings Panel (Dynamic) -->
+        <aside class="editor-right-panel" id="rightPanel">
+            <div class="panel-header">Settings</div>
+            <div id="toolSettings" class="settings-content">
+                <!-- Controls injected by tools.js -->
+            </div>
+        </aside>
+    </div>
+
+    <!-- Bottom Bar -->
+    <footer class="editor-bottom-bar">
+        <div class="bottom-left">
+            <!-- Status messages -->
+            <span id="statusText">Ready</span>
+        </div>
+        <div class="bottom-right">
+            <button class="btn-secondary" id="saveDraftBtn">Save Draft</button>
+            <button class="btn-primary" id="processBtn">Process & Download</button>
+        </div>
+    </footer>
+
+    <!-- Initial Data for JS -->
+    <script>
+        window.EDITOR_CONFIG = {
+            tool: "{{ tool }}",
+            sessionId: "{{ session_id }}",
+            files: {{ initial_files|safe }},
+            csrfToken: "{{ csrf_token }}"
+        };
+    </script>
+    <script src="{% static 'js/tools.js' %}?v=1.6"></script>
+    <script src="{% static 'js/editor.js' %}?v=1.6"></script>
+</body>
+</html>

@@ -9,17 +9,22 @@ import os
 import uuid
 import shutil
 from pathlib import Path
-
-from core.models import DocumentTask
-from core.tools import (
-    merge_pdfs,
-    img_to_pdf,
-    pdf_to_word,
-
-    pdf_to_excel,
-    edit_pdf
-    )
 import json
+
+# Try to import tools, handle potential import errors gracefully during dev
+try:
+    from core.models import DocumentTask
+    from core.tools import (
+        merge_pdfs,
+        img_to_pdf,
+        pdf_to_word,
+        pdf_to_excel,
+        edit_pdf,
+        compress_pdf
+    )
+except ImportError:
+    # Fallback for dev if models/tools aren't perfectly synced yet
+    pass
 
 def index(request):
     """Render the main landing page."""
@@ -40,6 +45,9 @@ def page_pdf2excel(request):
 def page_edit_pdf(request):
     return render(request, 'core/edit_pdf.html')
 
+def page_compress(request):
+    return render(request, 'core/compress.html')
+
 def page_result(request, task_id):
     """Render the result/success page for a given task."""
     try:
@@ -51,7 +59,8 @@ def page_result(request, task_id):
             'img2pdf': 'img2pdf_page',
             'pdf2word': 'pdf2word_page',
             'pdf2excel': 'pdf2excel_page',
-            'edit_pdf': 'edit_pdf_page'
+            'edit_pdf': 'edit_pdf_page',
+            'compress': 'compress_page'
         }
         
         # Get readable task name
@@ -61,6 +70,7 @@ def page_result(request, task_id):
             'pdf2word': 'PDF to Word',
             'pdf2excel': 'PDF to Excel',
             'edit_pdf': 'Edit PDF',
+            'compress': 'Compress PDF',
         }
         
         restart_url = '/' + task.task_type # default fallback
@@ -92,6 +102,8 @@ def save_uploaded_file(uploaded_file):
             destination.write(chunk)
     return file_path
 
+# --- API VIEWS ---
+
 def merge_pdfs_view(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
@@ -101,7 +113,6 @@ def merge_pdfs_view(request):
         if not files:
             return JsonResponse({'error': 'No files provided'}, status=400)
             
-        # Save input files
         input_paths = []
         original_names = []
         for f in files:
@@ -109,32 +120,24 @@ def merge_pdfs_view(request):
             input_paths.append(path)
             original_names.append(f.name)
             
-        # Prepare output path
         output_filename = f"merged_{uuid.uuid4()}.pdf"
         output_dir = os.path.join(settings.MEDIA_ROOT, 'outputs')
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, output_filename)
         
-        # Helper to ensure keys exist in tools (they might rely on some context)
-        # Assuming tools are pure functions as seen in review
         success = merge_pdfs(input_paths, output_path)
         
-        # Cleanup input files
         for p in input_paths:
-            try:
-                os.remove(p)
-            except:
-                pass
+            try: os.remove(p)
+            except: pass
                 
         if success:
-            # Create Task Record
             task = DocumentTask.objects.create(
                 task_type='merge',
                 status='success',
                 original_filenames=','.join(original_names),
                 output_file=f"outputs/{output_filename}"
             )
-            
             return JsonResponse({
                 'success': True,
                 'message': f'Successfully merged {len(files)} PDF(s)',
@@ -143,14 +146,7 @@ def merge_pdfs_view(request):
                 'task_id': task.id
             })
         else:
-            DocumentTask.objects.create(
-                task_type='merge',
-                status='failed',
-                original_filenames=','.join(original_names),
-                error_message="Merge operation failed"
-            )
             return JsonResponse({'error': 'Failed to merge PDFs'}, status=500)
-            
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
@@ -177,17 +173,6 @@ def img2pdf_view(request):
         
         if separate:
             output_files = []
-            output_urls = []
-            
-            # For separate files, we call logic for each or rely on tool?
-            # The tool `img_to_pdf` handles `single_pdf_per_image=True`
-            # But it returns boolean. We need to know the output filenames.
-            # The tool generates filenames based on input.
-            # Let's check tool logic again. 
-            # It saves to `output_file` (or directory if separate=True).
-            
-            # To be safe and trackable, let's call it per file if separate
-            
             success_count = 0
             for i, input_path in enumerate(input_paths):
                 base_name = os.path.splitext(files[i].name)[0]
@@ -202,22 +187,8 @@ def img2pdf_view(request):
                         output_file=f"outputs/{out_name}"
                     )
                     output_files.append(out_name)
-                    output_urls.append(task.output_file.url)
                     success_count += 1
             
-            # For separate files, we don't have a single "Result Page" easily unless we show a list.
-            # Current result page is designed for single file. 
-            # We will just stay on page for separate files or redirect to a list page?
-            # User request: "add next page or popup window to download there output"
-            # For multiple files, maybe we zip them? Or just list links. 
-            # For now, let's keep separate files behavior as is (stay on page) OR
-            # create a "batch result" page. Let's just create a dummy task for the batch or
-            # use the last task ID? 
-            # Actually, `img2pdf` with separate=True is an edge case. 
-            # Let's return task_id: null to indicate "stay here" or handle specifically.
-            pass
-            
-            # Cleanup
             for p in input_paths:
                 try: os.remove(p)
                 except: pass
@@ -226,17 +197,13 @@ def img2pdf_view(request):
                 'success': True,
                 'message': f'Successfully converted {success_count} images',
                 'files': output_files,
-                # 'urls': output_urls # JS expects files list or filename
             })
-            
         else:
-            # Single PDF
             output_filename = f"images_{uuid.uuid4()}.pdf"
             output_path = os.path.join(output_dir, output_filename)
             
             success = img_to_pdf(input_paths, output_path, single_pdf_per_image=False)
             
-            # Cleanup
             for p in input_paths:
                 try: os.remove(p)
                 except: pass
@@ -257,28 +224,23 @@ def img2pdf_view(request):
                 })
             else:
                 return JsonResponse({'error': 'Failed to convert images'}, status=500)
-                
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
 def pdf2word_view(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
-        
     try:
         if 'file' not in request.FILES:
             return JsonResponse({'error': 'No file provided'}, status=400)
-            
         f = request.FILES['file']
         input_path = save_uploaded_file(f)
-        
         output_filename = f"{os.path.splitext(f.name)[0]}_{uuid.uuid4()}.docx"
         output_dir = os.path.join(settings.MEDIA_ROOT, 'outputs')
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, output_filename)
         
         success = pdf_to_word(input_path, output_path)
-        
         try: os.remove(input_path)
         except: pass
         
@@ -298,28 +260,23 @@ def pdf2word_view(request):
             })
         else:
             return JsonResponse({'error': 'Failed to convert'}, status=500)
-            
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
 def pdf2excel_view(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
-        
     try:
         if 'file' not in request.FILES:
             return JsonResponse({'error': 'No file provided'}, status=400)
-            
         f = request.FILES['file']
         input_path = save_uploaded_file(f)
-        
         output_filename = f"{os.path.splitext(f.name)[0]}_{uuid.uuid4()}.xlsx"
         output_dir = os.path.join(settings.MEDIA_ROOT, 'outputs')
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, output_filename)
         
         success = pdf_to_excel(input_path, output_path)
-        
         try: os.remove(input_path)
         except: pass
         
@@ -339,47 +296,28 @@ def pdf2excel_view(request):
             })
         else:
             return JsonResponse({'error': 'Failed to convert'}, status=500)
-            
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
 def edit_pdf_view(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
-        
     try:
-        # Check if we have a file upload or a JSON body (for reordering/operations)
-        # But for the initial approach, we likely upload a file, getting back page info?
-        # Actually, the user flow is: Upload -> UI shows pages -> User edits -> Click Save -> Send Config
-        # Or: Upload -> Save file temp -> Return Page Count/Preview -> User edits -> Send Config + File ID
-        
-        # Simpler "all in one" or session based?
-        # Let's support a flow where we upload the file first to get info?
-        # OR: The standard tool flow: Upload file + Config in one POST request (if possible)
-        # Reordering locally in JS using pdf.js to show previews is best.
-        # But we need to send the ORIGINAL file + operations to backend.
-        
         if 'file' not in request.FILES:
              return JsonResponse({'error': 'No file provided'}, status=400)
-             
         f = request.FILES['file']
         pages_config_str = request.POST.get('pages_config', '[]')
         try:
             pages_config = json.loads(pages_config_str)
         except:
             return JsonResponse({'error': 'Invalid pages configuration'}, status=400)
-            
         input_path = save_uploaded_file(f)
-        
         output_filename = f"edited_{os.path.splitext(f.name)[0]}_{uuid.uuid4()}.pdf"
         output_dir = os.path.join(settings.MEDIA_ROOT, 'outputs')
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, output_filename)
         
-        start_page = int(request.POST.get('start_page', 1))
-        
         success = edit_pdf(input_path, output_path, pages_config)
-        
         try: os.remove(input_path)
         except: pass
         
@@ -399,95 +337,285 @@ def edit_pdf_view(request):
             })
         else:
             return JsonResponse({'error': 'Failed to edit PDF'}, status=500)
-
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
-from django.http import FileResponse
-import mimetypes
+def compress_pdf_view(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    try:
+        if 'file' not in request.FILES:
+            return JsonResponse({'error': 'No file provided'}, status=400)
+        f = request.FILES['file']
+        input_path = save_uploaded_file(f)
+        output_filename = f"compressed_{os.path.splitext(f.name)[0]}_{uuid.uuid4()}.pdf"
+        output_dir = os.path.join(settings.MEDIA_ROOT, 'outputs')
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, output_filename)
+        
+        success = compress_pdf(input_path, output_path)
+        try: os.remove(input_path)
+        except: pass
+        
+        if success:
+            task = DocumentTask.objects.create(
+                task_type='compress',
+                status='success',
+                original_filenames=f.name,
+                output_file=f"outputs/{output_filename}"
+            )
+            return JsonResponse({
+                'success': True,
+                'message': 'Successfully compressed PDF',
+                'filename': output_filename,
+                'url': task.output_file.url,
+                'task_id': task.id
+            })
+        else:
+            return JsonResponse({'error': 'Failed to compress PDF'}, status=500)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+# --- EDITOR STUDIO VIEWS ---
+
+def api_upload_session(request):
+    """Handle session-based file uploads for the Editor Studio."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    try:
+        files = request.FILES.getlist('files[]')
+        if not files and 'file' in request.FILES:
+             files = [request.FILES['file']]
+        if not files:
+            return JsonResponse({'error': 'No files provided'}, status=400)
+            
+        session_id = request.POST.get('session_id') or str(uuid.uuid4())
+        session_dir = os.path.join(settings.MEDIA_ROOT, 'sessions', session_id)
+        os.makedirs(session_dir, exist_ok=True)
+        
+        file_info = []
+        for f in files:
+            clean_name = os.path.basename(f.name)
+            file_path = os.path.join(session_dir, clean_name)
+            with open(file_path, 'wb+') as dest:
+                for chunk in f.chunks():
+                    dest.write(chunk)
+            file_info.append({
+                'name': clean_name,
+                'size': f.size,
+                'url': f"{settings.MEDIA_URL}sessions/{session_id}/{clean_name}"
+            })
+        return JsonResponse({
+            'success': True,
+            'session_id': session_id,
+            'files': file_info
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+def editor_view(request, tool, session_id):
+    """Render the unified editor studio."""
+    session_dir = os.path.join(settings.MEDIA_ROOT, 'sessions', session_id)
+    ctx = {
+        'tool': tool,
+        'session_id': session_id,
+        'initial_files': []
+    }
+    
+    if os.path.exists(session_dir):
+        for fname in os.listdir(session_dir):
+            fpath = os.path.join(session_dir, fname)
+            if os.path.isfile(fpath):
+                ctx['initial_files'].append({
+                    'name': fname,
+                    'size': os.path.getsize(fpath),
+                    'url': f"{settings.MEDIA_URL}sessions/{session_id}/{fname}"
+                })
+    return render(request, 'core/editor.html', ctx)
 
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 @xframe_options_sameorigin
 def download_redirect(request, filename):
     """Serve file with optional renaming."""
-    # Security check: prevent directory traversal
+    from django.http import FileResponse
+    import mimetypes
+    
     filename = os.path.basename(filename)
     output_dir = os.path.join(settings.MEDIA_ROOT, 'outputs')
     file_path = os.path.join(output_dir, filename)
     
-    print(f"DEBUG: Download request for {filename}")
-    
-    # 1. Resolve File Path (Exact or Fuzzy)
-    real_filename = filename
     if not os.path.exists(file_path):
-        print(f"DEBUG: Not found at {file_path}. Fuzzy searching...")
+        # Fuzzy search
         found = False
-        # Heuristic: UUIDs are long, look for files containing this string
         if len(filename) > 20: 
              for f in os.listdir(output_dir):
                  if filename in f:
                      file_path = os.path.join(output_dir, f)
-                     real_filename = f
+                     filename = f # Update real filename
                      found = True
-                     print(f"DEBUG: Fuzzy match found: {real_filename}")
                      break
-        
         if not found:
-            print("DEBUG: No match found.")
             return HttpResponse('File not found', status=404)
-    else:
-        real_filename = filename
 
-    # 2. Determine Correct Extension from Real File
-    _, real_ext = os.path.splitext(real_filename)
+    # Determine Correct Extension
+    _, real_ext = os.path.splitext(filename)
     if not real_ext:
-        # Fallback if disk file has no extension (rare)
         is_pdf = False
         try:
             with open(file_path, 'rb') as f:
-                if f.read(4).startswith(b'%PDF'):
-                    is_pdf = True
+                if f.read(4).startswith(b'%PDF'): is_pdf = True
         except: pass
         real_ext = '.pdf' if is_pdf else '.bin'
 
-    # 3. Determine Output Filename
-    custom_name = request.GET.get('name')
-    if custom_name:
-        custom_name = custom_name.strip()
-    else:
-        custom_name = real_filename
-
-    # ALWAYS Enforce the REAL extension on the custom name
-    # Verify we aren't duplicating extension (e.g. file.pdf.pdf)
+    custom_name = request.GET.get('name', filename).strip()
     if not custom_name.lower().endswith(real_ext.lower()):
         custom_name += real_ext
 
-    # 4. MIME Type
-    if real_ext.lower() == '.pdf':
-        content_type = 'application/pdf'
-    elif real_ext.lower() == '.docx':
-        content_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    elif real_ext.lower() == '.xlsx':
-        content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    # MIME Type
+    if real_ext.lower() == '.pdf': content_type = 'application/pdf'
+    elif real_ext.lower() == '.docx': content_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    elif real_ext.lower() == '.xlsx': content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     else:
         content_type, _ = mimetypes.guess_type(file_path)
-        if not content_type:
-            content_type = 'application/octet-stream'
-
-    log_msg = f"REQ: {filename} | REAL: {real_filename} | EXT: {real_ext} | FINAL: {custom_name} | TYPE: {content_type}\n"
-    print(f"DEBUG: {log_msg.strip()}")
-    try:
-        with open('debug_download.log', 'a') as logf:
-            logf.write(log_msg)
-    except: pass
+        if not content_type: content_type = 'application/octet-stream'
 
     response = FileResponse(open(file_path, 'rb'), content_type=content_type)
-    
-    # Check for preview mode
-    disposition = 'attachment'
-    if request.GET.get('preview') == 'true':
-        disposition = 'inline'
-        
+    disposition = 'inline' if request.GET.get('preview') == 'true' else 'attachment'
     response['Content-Disposition'] = f'{disposition}; filename="{custom_name}"'
     return response
+
+def editor_entry_view(request, tool):
+    """EntryPoint for tools to land directly on the editor."""
+    # We use 'new' as session_id to indicate a fresh start
+    return editor_view(request, tool, 'new')
+
+def api_process_session(request, tool, session_id):
+    """Unified endpoint to call tools on session files."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        session_dir = os.path.join(settings.MEDIA_ROOT, 'sessions', session_id)
+        if not os.path.exists(session_dir):
+            return JsonResponse({'error': 'Session expired or invalid'}, status=404)
+
+        output_dir = os.path.join(settings.MEDIA_ROOT, 'outputs')
+        os.makedirs(output_dir, exist_ok=True)
+        task_output_file = None
+        task_original_names = []
+
+        if tool == 'merge':
+            # Expect data['files'] as ordered list of filenames
+            ordered_files = data.get('files', [])
+            
+            input_paths = []
+            if ordered_files:
+                for fname in ordered_files:
+                     fpath = os.path.join(session_dir, fname)
+                     if os.path.exists(fpath):
+                         input_paths.append(fpath)
+                         task_original_names.append(fname)
+            else:
+                # Fallback: all files
+                for fname in os.listdir(session_dir):
+                    fpath = os.path.join(session_dir, fname)
+                    if os.path.isfile(fpath):
+                        input_paths.append(fpath)
+                        task_original_names.append(fname)
+
+            if not input_paths:
+                 return JsonResponse({'error': 'No files to merge'}, status=400)
+
+            out_name = f"merged_{uuid.uuid4()}.pdf"
+            out_path = os.path.join(output_dir, out_name)
+            
+            success = merge_pdfs(input_paths, out_path)
+            if success:
+                task_output_file = f"outputs/{out_name}"
+
+        elif tool == 'compress':
+            files = [f for f in os.listdir(session_dir) if os.path.isfile(os.path.join(session_dir, f))]
+            if not files: return JsonResponse({'error': 'No file'}, status=400)
+            
+            fname = files[0] # Compress first file only for now
+            input_path = os.path.join(session_dir, fname)
+            out_name = f"compressed_{uuid.uuid4()}.pdf"
+            out_path = os.path.join(output_dir, out_name)
+            
+            success = compress_pdf(input_path, out_path)
+            if success:
+                 task_output_file = f"outputs/{out_name}"
+                 task_original_names.append(fname)
+
+        elif tool == 'edit_pdf':
+            files = [f for f in os.listdir(session_dir) if os.path.isfile(os.path.join(session_dir, f))]
+            if not files: return JsonResponse({'error': 'No file'}, status=400)
+            
+            fname = files[0]
+            input_path = os.path.join(session_dir, fname)
+            out_name = f"edited_{uuid.uuid4()}.pdf"
+            out_path = os.path.join(output_dir, out_name)
+            
+            # data['pages_config'] should be the list of operations
+            pages_config = data.get('pages_config', [])
+            success = edit_pdf(input_path, out_path, pages_config)
+            if success:
+                 task_output_file = f"outputs/{out_name}"
+                 task_original_names.append(fname)
+        
+        elif tool == 'pdf2word':
+             files = [f for f in os.listdir(session_dir) if os.path.isfile(os.path.join(session_dir, f))]
+             fname = files[0]
+             input_path = os.path.join(session_dir, fname)
+             out_name = f"{os.path.splitext(fname)[0]}_{uuid.uuid4()}.docx"
+             out_path = os.path.join(output_dir, out_name)
+             
+             success = pdf_to_word(input_path, out_path)
+             if success:
+                 task_output_file = f"outputs/{out_name}"
+                 task_original_names.append(fname)
+
+        elif tool == 'pdf2excel':
+             files = [f for f in os.listdir(session_dir) if os.path.isfile(os.path.join(session_dir, f))]
+             fname = files[0]
+             input_path = os.path.join(session_dir, fname)
+             out_name = f"{os.path.splitext(fname)[0]}_{uuid.uuid4()}.xlsx"
+             out_path = os.path.join(output_dir, out_name)
+             
+             success = pdf_to_excel(input_path, out_path)
+             if success:
+                 task_output_file = f"outputs/{out_name}"
+                 task_original_names.append(fname)
+                 
+        elif tool == 'img2pdf':
+             # Similar to merge but with img_to_pdf
+             input_paths = []
+             for fname in os.listdir(session_dir):
+                 input_paths.append(os.path.join(session_dir, fname))
+                 task_original_names.append(fname)
+             
+             out_name = f"images_{uuid.uuid4()}.pdf"
+             out_path = os.path.join(output_dir, out_name)
+             success = img_to_pdf(input_paths, out_path, False)
+             if success:
+                 task_output_file = f"outputs/{out_name}"
+
+
+        if task_output_file:
+             task = DocumentTask.objects.create(
+                task_type=tool,
+                status='success',
+                original_filenames=','.join(task_original_names),
+                output_file=task_output_file
+            )
+             return JsonResponse({
+                'success': True,
+                'redirect_url': f"/result/{task.id}"
+            })
+        else:
+             return JsonResponse({'error': 'Processing failed'}, status=500)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
