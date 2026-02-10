@@ -115,7 +115,7 @@
         </div>
         
         <div style="display: flex; gap: 16px; justify-content: center;">
-            <a href="/download/{{ filename }}" id="download-btn" class="btn-download" target="_blank">
+            <a href="/download/{{ filename }}" id="download-btn" class="btn-download" download="{{ filename }}">
                 <span>⬇️</span> Download File
             </a>
             <button id="preview-btn" class="btn-download" style="background: white; color: var(--primary); border: 2px solid var(--primary); box-shadow: none;">
@@ -160,7 +160,9 @@
             }
 
             function updateLink() {
+                const newName = input.value.trim() || originalFilename;
                 downloadLink.href = getDownloadUrl(false);
+                downloadLink.setAttribute('download', newName.endsWith('.pdf') ? newName : newName + '.pdf');
             }
             
             input.addEventListener('input', updateLink);

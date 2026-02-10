@@ -1,325 +1,373 @@
-/* Editor Layout */
+/* Modern Editor UI - Doc Javelin */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+    --primary: #4f46e5;       /* Indigo-600 */
+    --primary-hover: #4338ca; /* Indigo-700 */
+    --primary-light: #e0e7ff; /* Indigo-100 */
+    --secondary: #10b981;     /* Emerald-500 */
+    --bg-main: #f3f4f6;       /* Gray-100 */
+    --bg-canvas: #e5e7eb;     /* Gray-200 */
+    --surface: #ffffff;
+    --text-main: #1f2937;     /* Gray-800 */
+    --text-muted: #6b7280;    /* Gray-500 */
+    --border: #e5e7eb;        /* Gray-200 */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --danger: #ef4444;
+}
+
+body {
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-main);
+    color: var(--text-main);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* =========================================
+   Top Bar
+   ========================================= */
 .editor-top-bar {
-    height: 60px;
-    background: white;
+    height: 64px;
+    background: var(--surface);
     border-bottom: 1px solid var(--border);
     display: flex;
+    align-items: center;
     justify-content: space-between;
+    padding: 0 24px;
+    z-index: 50;
+    box-shadow: var(--shadow-sm);
+}
+
+.top-left, .top-center, .top-right {
+    display: flex;
     align-items: center;
-    padding: 0 20px;
+    gap: 16px;
 }
 
-.editor-workspace {
-    display: grid;
-    grid-template-columns: 60px 1fr 300px; /* Left Toolbar, Canvas, Right Panel */
-    height: calc(100vh - 120px); /* Minus Top (60) and Bottom (60) */
-    background: var(--light-gray);
+.back-home {
+    text-decoration: none;
+    color: var(--text-muted);
+    font-size: 1.25rem;
+    transition: color 0.2s;
 }
+.back-home:hover { color: var(--text-main); }
 
-.editor-left-panel {
-    background: white;
-    border-right: 1px solid var(--border);
+.file-info {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    padding: 10px 0;
-    gap: 15px;
-}
-
-.editor-canvas {
-    padding: 20px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;
-    position: relative;
-    background: #e5e7eb; /* Canvas background darker for contrast */
-}
-
-.editor-right-panel {
-    background: white;
-    border-left: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-}
-
-.editor-bottom-bar {
-    height: 60px;
-    background: white;
-    border-top: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 25px;
-}
-
-/* Components */
-.top-left { display: flex; align-items: center; gap: 15px; }
-.back-home { text-decoration: none; color: var(--dark); font-size: 1.2rem; }
-.tool-name { font-weight: 700; color: var(--primary); }
-.file-name { color: var(--gray); font-size: 0.9rem; }
-.separator { color: var(--border); }
-
-.tool-btn { 
-    background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 8px; border-radius: 4px; color: var(--dark);
-}
-.tool-btn:hover { background: var(--light-gray); }
-
-.btn-primary {
-    background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;
-}
-.btn-primary:hover { background: var(--primary-dark); }
-
-.btn-secondary {
-    background: white; color: var(--dark); border: 1px solid var(--border); padding: 10px 20px; border-radius: 6px; font-weight: 500; cursor: pointer; margin-right: 10px;
-}
-.btn-secondary:hover { background: var(--light-gray); }
-
-.btn-close {
-    background: none; border: none; color: var(--danger); font-weight: 600; cursor: pointer;
-}
-.btn-text {
-    background: none; border: none; color: var(--gray); font-weight: 500; cursor: pointer; margin-right: 15px;
-}
-
-/* Canvas Content */
-.canvas-content {
-    width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;
-}
-.pdf-viewer-frame {
-    width: 100%; height: 100%; border: none; background: white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-}
-
-/* Panel Styles */
-.panel-header {
-    padding: 15px; font-weight: 600; border-bottom: 1px solid var(--border); background: #f9fafb;
-}
-.settings-content {
-    padding: 20px;
-}
-
-/* Dynamic Tool Icons */
-.tool-icon {
-    width: 40px; height: 40px; border-radius: 8px; display: flex; justify-content: center; align-items: center; cursor: pointer; color: var(--gray);
-}
-.tool-icon:hover, .tool-icon.active {
-    background: rgba(37, 99, 235, 0.1); color: var(--primary);
-}
-
-/* Control Elements */
-.control-group { margin-bottom: 20px; }
-.control-label { display: block; margin-bottom: 8px; font-size: 0.9rem; font-weight: 500; }
-.control-slider { width: 100%; }
-
-/* Upload Box */
-.upload-box {
-    text-align: center;
-    background: white;
-    padding: 40px;
-    border-radius: 16px;
-    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-    max-width: 400px;
-    width: 100%;
-}
-.upload-icon { font-size: 3rem; margin-bottom: 15px; }
-.upload-box h2 { margin-bottom: 10px; color: var(--dark); }
-.upload-box p { color: var(--gray); margin-bottom: 20px; }
-
-/* Card Actions */
-.card-actions {
-    display: flex;
     gap: 8px;
-    margin-top: 8px;
+    font-size: 0.95rem;
 }
+.tool-name { font-weight: 600; color: var(--primary); }
+.separator { color: var(--border); }
+.file-name { color: var(--text-main); font-weight: 500; }
 
-.btn-mini {
-    background: white;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+.tool-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.25rem;
     cursor: pointer;
-    font-size: 0.9rem;
-    color: var(--dark);
+    padding: 8px;
+    border-radius: 8px;
     transition: all 0.2s;
+    display: flex;
+    align-items: center; justify-content: center;
 }
-
-.btn-mini:hover {
-    background: var(--light-gray);
-    border-color: var(--primary);
+.tool-btn:hover {
+    background: var(--bg-main);
     color: var(--primary);
 }
 
-.btn-mini.btn-danger:hover {
-    background: #fee2e2;
-    border-color: var(--danger);
-    color: var(--danger);
-}
-
-.btn-remove { display: none; } /* Hide old absolute button */
-
-/* File Grid View */
-.file-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 20px;
-    width: 100%;
-    max-width: 1000px;
-    padding: 20px;
-    overflow-y: auto;
-    height: 100%;
-}
-
-/* Professional Grid Cards */
-.file-card {
-    background: white;
+.btn-primary, .btn-secondary, .btn-close, .btn-text {
     border-radius: 8px;
-    padding: 0; 
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    border: 1px solid var(--border);
-    cursor: grab;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden; 
-    height: 240px; 
-    text-align: left;
-}
-
-.file-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
-    border-color: var(--primary-light);
-}
-
-.file-card.dragging {
-    opacity: 0.5;
-    transform: scale(0.95);
-}
-.file-card.over {
-    border: 2px dashed var(--primary);
-}
-
-.file-preview-wrapper {
-    width: 100%;
-    flex: 1;
-    background: #f8fafc; /* Slate-50 */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    position: relative;
-    border-bottom: 1px solid var(--border);
-    /* Pattern for professional look */
-    background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
-    background-size: 10px 10px;
-}
-
-.pdf-thumb {
-    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-    max-width: 80%;
-    max-height: 90%;
-    object-fit: contain;
-    transition: transform 0.3s ease;
-    background: white; /* Ensure PDF has bg */
-}
-
-.file-card:hover .pdf-thumb {
-    transform: scale(1.05);
-}
-
-.file-info-grid {
-    padding: 12px;
-    background: white;
-    width: 100%;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    border-top: 1px solid #f1f5f9;
-}
-
-.file-name {
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: var(--dark);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-bottom: 2px;
-}
-
-.file-meta-row {
-     display: flex;
-     justify-content: space-between;
-     align-items: center;
-     font-size: 0.75rem;
-     color: var(--gray);
-     margin-top: 4px;
-}
-
-.file-size {
-    font-size: 0.75rem;
-    color: var(--gray);
-}
-
-.page-count-badge {
-    background: #e0f2fe;
-    color: #0369a1;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-weight: 600;
-    display: inline-block;
-}
-
-/* Actions Overlay */
-.card-actions {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    display: flex;
-    gap: 6px;
-    opacity: 0; /* Hidden by default */
-    transition: opacity 0.2s ease;
-    z-index: 10;
-    margin-top: 0; /* Reset */
-}
-
-.file-card:hover .card-actions {
-    opacity: 1;
-}
-
-.btn-mini {
-    width: 28px;
-    height: 28px;
-    background: rgba(255, 255, 255, 0.95);
-    border: 1px solid rgba(0,0,0,0.1);
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    color: var(--dark);
+    font-weight: 500;
+    font-size: 0.9rem;
+    padding: 8px 16px;
     cursor: pointer;
-    font-size: 14px;
-    backdrop-filter: blur(4px);
     transition: all 0.2s;
 }
 
-.btn-mini:hover {
+.btn-primary {
     background: var(--primary);
     color: white;
+    border: none;
+    box-shadow: var(--shadow-sm);
+}
+.btn-primary:hover {
+    background: var(--primary-hover);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: white;
+    border: 1px solid var(--border);
+    color: var(--text-main);
+}
+.btn-secondary:hover {
+    background: var(--bg-main);
+    border-color: var(--text-muted);
+}
+
+.btn-close {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--danger);
+}
+.btn-close:hover {
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+
+/* =========================================
+   Workspace Layout
+   ========================================= */
+.editor-workspace {
+    flex: 1;
+    display: flex;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Floating Loading Dock (Left Panel) */
+.editor-left-panel {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 60px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 16px;
+    padding: 12px 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    box-shadow: var(--shadow-lg);
+}
+
+/* Main Canvas Area */
+.editor-canvas {
+    flex: 1;
+    background: var(--bg-canvas);
+    background-image: radial-gradient(#d1d5db 1px, transparent 1px);
+    background-size: 20px 20px;
+    position: relative;
+    overflow: auto;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 40px;
+}
+
+/* Right Properties Panel */
+.editor-right-panel {
+    width: 320px;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    z-index: 30;
+    box-shadow: -4px 0 15px rgba(0,0,0,0.02);
+}
+
+.panel-header {
+    height: 50px;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-main);
+    background: white;
+}
+
+.settings-content {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+}
+
+/* Bottom Bar */
+.editor-bottom-bar {
+    height: 64px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    z-index: 50;
+}
+
+/* =========================================
+   Components
+   ========================================= */
+
+/* Tool Icons */
+.tool-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 1.4rem;
+    transition: all 0.2s;
+}
+.tool-icon:hover {
+    background: var(--bg-main);
+    color: var(--primary);
+    transform: scale(1.05);
+}
+.tool-icon.active {
+    background: var(--primary-light);
+    color: var(--primary);
+    box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.tool-separator {
+    width: 60%;
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+}
+
+/* Canvas Internal */
+.canvas-content {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100%;
+}
+
+.pdf-viewer-frame {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    border-radius: 4px; /* Slight round on PDF page looks nice */
+}
+
+/* Upload Box */
+.upload-box {
+    background: white;
+    padding: 48px;
+    border-radius: 20px;
+    box-shadow: var(--shadow-lg);
+    text-align: center;
+    border: 2px dashed var(--border);
+    transition: all 0.2s;
+}
+.upload-box:hover {
     border-color: var(--primary);
+    transform: translateY(-2px);
+}
+.upload-icon {
+    font-size: 4rem;
+    color: var(--primary-light);
+    margin-bottom: 16px;
+    display: block;
 }
 
-.btn-mini.btn-danger:hover {
-    background: var(--danger);
-    color: white;
-    border-color: var(--danger);
+/* Modals */
+.modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(4px);
+    z-index: 2000;
+    display: none;
+    justify-content: center;
+    align-items: center;
 }
 
-.btn-remove { display: none; }
+.modal-container {
+    background: white;
+    width: 500px;
+    border-radius: 20px;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    animation: modalPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalPop {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.modal-header {
+    background: white;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+}
+
+.modal-title { margin: 0; font-size: 1.25rem; font-weight: 600; }
+
+.modal-tabs {
+    display: flex; gap: 4px; background: var(--bg-main); padding: 4px;
+    margin: 20px 24px 0; border-radius: 10px;
+}
+
+.modal-tab {
+    flex: 1; text-align: center; padding: 10px;
+    cursor: pointer; font-weight: 500; font-size: 0.9rem;
+    border-radius: 8px; color: var(--text-muted);
+}
+.modal-tab:hover { color: var(--text-main); }
+.modal-tab.active {
+    background: white; color: var(--primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.tab-content { padding: 24px; display: none; }
+.tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.signature-pad-wrapper {
+    background: white; border: 2px solid var(--border);
+    border-radius: 12px; height: 200px;
+    background-image: radial-gradient(#d1d5db 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+/* Grid & Cards (retained/polished) */
+.file-grid {
+    display: grid; 
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
+    gap: 24px; width: 100%; max-width: 1200px; padding: 0 20px;
+}
+
+.file-card {
+    background: white; border-radius: 12px; border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm); overflow: hidden;
+    height: 260px; display: flex; flex-direction: column;
+    transition: all 0.2s; cursor: grab;
+}
+.file-card:hover {
+    box-shadow: var(--shadow-lg); transform: translateY(-4px); border-color: var(--primary-light);
+}
+.file-preview-wrapper {
+    flex: 1; background: var(--bg-main); display: flex; justify-content: center; align-items: center;
+    border-bottom: 1px solid var(--border);
+}
+.file-info-grid { padding: 16px; background: white; }
+
+.btn-mini {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: white; color: var(--text-muted);
+    display: flex; justify-content: center; align-items: center;
+    box-shadow: var(--shadow-md); transition: transform 0.2s;
+}
+.btn-mini:hover { color: var(--primary); transform: scale(1.1); }
+.btn-mini.btn-danger:hover { color: var(--danger); }

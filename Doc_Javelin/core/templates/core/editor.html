@@ -12,6 +12,8 @@
     </script>
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/editor.css' %}">
+    <!-- RemixIcon -->
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     <style>
          :root {
             /* Inherit Theme from Base */
@@ -42,6 +44,10 @@
         </div>
         
         <div class="top-center">
+            <button class="tool-btn" id="zoomOutBtn" title="Zoom Out">➖</button>
+            <span id="zoomLevelDisplay" style="font-size: 0.8rem; color: var(--gray); margin: 0 8px; min-width: 40px; text-align: center;">100%</span>
+            <button class="tool-btn" id="zoomInBtn" title="Zoom In">➕</button>
+            <span style="border-right: 1px solid var(--border); margin: 0 12px; height: 20px;"></span>
             <button class="tool-btn" id="undoBtn" title="Undo">↩</button>
             <button class="tool-btn" id="redoBtn" title="Redo">↪</button>
         </div>
@@ -100,16 +106,85 @@
         </div>
     </footer>
 
+    <!-- Preview Modal -->
+    <div id="preview-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center;">
+        <div style="background: white; width: 90%; height: 90%; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; position: relative;">
+            <div style="padding: 16px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+                <h3 style="margin: 0; color: var(--dark);">Document Preview</h3>
+                <button onclick="closePreview()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray);">&times;</button>
+            </div>
+            <iframe id="preview-frame" style="flex: 1; border: none; width: 100%; height: 100%;" src=""></iframe>
+        </div>
+    </div>
+
+    <!-- Signature Modal -->
+    <div id="signature-modal" class="modal-overlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3 class="modal-title">Add Signature</h3>
+                <button onclick="closeSignatureModal()" class="btn-close" style="font-size: 1.5rem;">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="modal-tabs">
+                    <div class="modal-tab active" onclick="switchSigTab('draw')">Draw</div>
+                    <div class="modal-tab" onclick="switchSigTab('type')">Type</div>
+                    <div class="modal-tab" onclick="switchSigTab('upload')">Upload</div>
+                </div>
+                
+                <!-- Draw Tab -->
+                <div id="sig-draw" class="tab-content active">
+                    <div class="signature-pad-wrapper" id="sig-pad-container">
+                        <!-- Canvas injected by JS -->
+                    </div>
+                    <div style="text-align: right; margin-top: 8px;">
+                        <button class="btn-text" onclick="clearSignaturePad()">Clear</button>
+                    </div>
+                </div>
+                
+                <!-- Type Tab -->
+                <div id="sig-type" class="tab-content">
+                    <input type="text" id="sig-nav-input" class="signature-input" placeholder="Type your name" oninput="updateSigPreview(this.value)">
+                    <div id="sig-type-preview" class="font-preview" style="font-family: 'Great Vibes', cursive;"></div>
+                    <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+                        <button class="btn-secondary" onclick="changeSigFont('Great Vibes')">Great Vibes</button>
+                        <button class="btn-secondary" onclick="changeSigFont('Sacramento')">Sacramento</button>
+                    </div>
+                </div>
+                
+                <!-- Upload Tab -->
+                <div id="sig-upload" class="tab-content">
+                    <div class="upload-box" style="padding: 20px;">
+                        <input type="file" id="sig-upload-input" accept="image/*" style="display: block; margin: 0 auto;">
+                        <div id="sig-upload-preview" style="margin-top: 20px; text-align: center;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeSignatureModal()">Cancel</button>
+                <button class="btn-primary" onclick="addSignatureToCanvas()">Add Signature</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Initial Data for JS -->
+    {{ initial_files|json_script:"initial-files-data" }}
     <script>
         window.EDITOR_CONFIG = {
             tool: "{{ tool }}",
             sessionId: "{{ session_id }}",
-            files: {{ initial_files|safe }},
+            files: JSON.parse(document.getElementById('initial-files-data').textContent),
             csrfToken: "{{ csrf_token }}"
         };
     </script>
-    <script src="{% static 'js/tools.js' %}?v=1.6"></script>
-    <script src="{% static 'js/editor.js' %}?v=1.6"></script>
+    <script src="{% static 'js/tools.js' %}?v=2.0"></script>
+    <script src="{% static 'js/editor.js' %}?v=2.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <script src="{% static 'js/fabric-overlay.js' %}?v=1.0"></script>
+    <script src="{% static 'js/signature.js' %}?v=1.0"></script>
+    <script src="{% static 'js/inspector.js' %}?v=1.0"></script>
+    <!-- Fonts for Signatures -->
+    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Sacramento&display=swap" rel="stylesheet">
 </body>
 </html>

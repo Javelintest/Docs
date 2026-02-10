@@ -619,3 +619,92 @@ def api_process_session(request, tool, session_id):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+def api_editor_apply(request, session_id):
+    """
+    Apply annotation layers to a PDF and generate final output.
+    Expects POST with JSON body: { layers: [...] }
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        from core.tools.pdf_flattener import flatten_pdf_with_layers
+        
+        data = json.loads(request.body)
+        layers = data.get('layers', [])
+        
+        session_dir = os.path.join(settings.MEDIA_ROOT, 'sessions', session_id)
+        if not os.path.exists(session_dir):
+            return JsonResponse({'error': 'Session not found'}, status=404)
+        
+        # Get the first PDF in session
+        pdf_files = [f for f in os.listdir(session_dir) if f.lower().endswith('.pdf')]
+        if not pdf_files:
+            return JsonResponse({'error': 'No PDF found in session'}, status=400)
+        
+        input_pdf = os.path.join(session_dir, pdf_files[0])
+        
+        # Generate output path
+        output_dir = os.path.join(settings.MEDIA_ROOT, 'outputs')
+        os.makedirs(output_dir, exist_ok=True)
+        output_name = f"edited_{uuid.uuid4()}.pdf"
+        output_path = os.path.join(output_dir, output_name)
+        
+        # Flatten layers
+        success = flatten_pdf_with_layers(input_pdf, layers, output_path)
+        
+        if success:
+            # Create task record
+            task = DocumentTask.objects.create(
+                task_type='edit_pdf',
+                status='success',
+                original_filenames=pdf_files[0],
+                output_file=f"outputs/{output_name}"
+            )
+            return JsonResponse({
+                'success': True,
+                'redirect_url': f"/result/{task.id}"
+            })
+        else:
+            return JsonResponse({'error': 'Failed to flatten PDF'}, status=500)
+            
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+def api_analyze_pdf(request, session_id, page_num):
+    """
+    Analyze text on a specific PDF page for Inspector Mode.
+    """
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+        
+    try:
+        from core.tools.pdf_analyzer import analyze_pdf_text
+        
+        session_dir = os.path.join(settings.MEDIA_ROOT, 'sessions', session_id)
+        if not os.path.exists(session_dir):
+            return JsonResponse({'error': 'Session not found'}, status=404)
+            
+        # Get the first PDF in session
+        pdf_files = [f for f in os.listdir(session_dir) if f.lower().endswith('.pdf')]
+        if not pdf_files:
+            return JsonResponse({'error': 'No PDF found in session'}, status=400)
+            
+        input_pdf = os.path.join(session_dir, pdf_files[0])
+        
+        # Analyze
+        text_data = analyze_pdf_text(input_pdf, int(page_num))
+        
+        if text_data is None:
+             return JsonResponse({'error': 'Failed to analyze text'}, status=500)
+             
+        return JsonResponse({
+            'success': True,
+            'page': page_num,
+            'text_blocks': text_data
+        })
+            
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

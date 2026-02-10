@@ -21,20 +21,27 @@ const TOOLS = {
     },
     'edit_pdf': {
         name: 'Edit PDF',
+        canvasMode: 'advanced', // New advanced mode with Fabric.js overlay
         leftPanel: [
-            { id: 'addPage', icon: '➕', title: 'Add Page' },
-            { id: 'deletePage', icon: '🗑️', title: 'Delete Page' },
-            { id: 'rotateLeft', icon: '↺', title: 'Rotate Left' },
-            { id: 'rotateRight', icon: '↻', title: 'Rotate Right' }
+            { id: 'selectTool', icon: '<i class="ri-cursor-line"></i>', title: 'Select', tool: true },
+            { id: 'textEditTool', icon: '<i class="ri-text-spacing"></i>', title: 'Edit Text (Beta)', tool: true },
+            { id: 'textTool', icon: '<i class="ri-text"></i>', title: 'Add Text', tool: true },
+            { id: 'imageTool', icon: '<i class="ri-image-add-line"></i>', title: 'Add Image', tool: true },
+            { id: 'signatureTool', icon: '<i class="ri-pen-nib-line"></i>', title: 'Add Signature', tool: true },
+            { id: 'drawTool', icon: '<i class="ri-pencil-line"></i>', title: 'Draw', tool: true },
+            { id: 'highlightTool', icon: '<i class="ri-mark-pen-line"></i>', title: 'Highlight', tool: true },
+            { id: 'separator', type: 'separator' },
+            { id: 'rotateLeft', icon: '<i class="ri-anticlockwise-2-line"></i>', title: 'Rotate Left' },
+            { id: 'rotateRight', icon: '<i class="ri-clockwise-2-line"></i>', title: 'Rotate Right' },
+            { id: 'deletePage', icon: '<i class="ri-delete-bin-line"></i>', title: 'Delete Page' }
         ],
         rightPanel: [
             {
                 type: 'info',
-                label: 'Info',
-                text: 'Select pages to rotate or delete.'
+                label: 'Properties',
+                text: 'Select an object to edit properties.'
             }
         ],
-        canvasMode: 'pages', // New mode for Page Grid
         processEndpoint: '/api/edit-pdf'
     },
     'merge': {

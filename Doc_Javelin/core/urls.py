@@ -23,6 +23,8 @@ urlpatterns = [
     # Editor Studio
     path('api/upload-session', views.api_upload_session, name='api_upload_session'),
     path('api/process-session/<str:tool>/<str:session_id>', views.api_process_session, name='api_process_session'),
+    path('api/editor/apply/<str:session_id>', views.api_editor_apply, name='api_editor_apply'),
+    path('api/analyze-pdf/<str:session_id>/<int:page_num>', views.api_analyze_pdf, name='api_analyze_pdf'),
     path('editor/<str:tool>/<str:session_id>', views.editor_view, name='editor_view'),
 
     # Downloads

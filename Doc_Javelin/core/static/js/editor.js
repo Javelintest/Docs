@@ -35,11 +35,20 @@ function renderLeftPanel(items) {
     if (!items || items.length === 0) return;
 
     items.forEach(item => {
+        if (item.type === 'separator') {
+            const sep = document.createElement('div');
+            sep.className = 'tool-separator';
+            sep.style.cssText = 'width: 80%; height: 1px; background: var(--border); margin: 10px 0;';
+            container.appendChild(sep);
+            return;
+        }
+        
         const btn = document.createElement('div');
         btn.className = 'tool-icon';
         btn.innerHTML = item.icon;
         btn.title = item.title;
-        btn.onclick = () => handleToolAction(item.id);
+        btn.dataset.tool = item.id; // For active state
+        btn.onclick = () => handleToolAction(item.id, item.tool);
         container.appendChild(btn);
     });
 }
@@ -73,11 +82,131 @@ function renderCanvas(files, mode) {
         renderGridView(container, files);
     } else if (mode === 'pages') {
         renderPageGridView(container, files);
+    } else if (mode === 'advanced') {
+        renderAdvancedEditorView(container, files);
     } else {
         const iframe = document.createElement('iframe');
         iframe.src = files[0].url + "#toolbar=0";
         iframe.className = 'pdf-viewer-frame';
         container.appendChild(iframe);
+    }
+}
+
+/**
+ * Advanced Editor View - PDF with Fabric.js overlay
+ */
+async function renderAdvancedEditorView(container, files) {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    
+    // Create wrapper for PDF + overlay
+    const wrapper = document.createElement('div');
+    wrapper.id = 'advanced-editor-wrapper';
+    wrapper.style.cssText = 'position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; overflow: auto;';
+    container.appendChild(wrapper);
+    
+    displayStatus("Loading PDF...", "normal");
+    
+    try {
+        const loadingTask = pdfjsLib.getDocument(file.url);
+        const pdf = await loadingTask.promise;
+        
+        window.EDITOR_CONFIG.pdfDoc = pdf;
+        window.EDITOR_CONFIG.pageCount = pdf.numPages;
+        window.EDITOR_STATE = window.EDITOR_STATE || {};
+        window.EDITOR_STATE.currentPage = 1;
+        
+        // Render first page as canvas
+        const pageContainer = document.createElement('div');
+        pageContainer.id = 'page-container';
+        pageContainer.style.cssText = 'position: relative; margin: 20px auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+        wrapper.appendChild(pageContainer);
+        
+        await renderPDFPage(pdf, 1, pageContainer);
+        
+        // Initialize Fabric.js overlay on top
+        setTimeout(() => {
+            if (typeof initFabricOverlay === 'function') {
+                initFabricOverlay('#page-container');
+            }
+            displayStatus(`Loaded ${pdf.numPages} page(s). Select a tool to edit.`, "success");
+        }, 100);
+        
+        // Add page navigation if multiple pages
+        if (pdf.numPages > 1) {
+            const nav = document.createElement('div');
+            nav.id = 'page-nav';
+            nav.style.cssText = 'display: flex; gap: 12px; align-items: center; margin-top: 16px;';
+            nav.innerHTML = `
+                <button class="btn-secondary" onclick="navigatePage(-1)">◀ Prev</button>
+                <span id="page-indicator" style="font-size: 0.9rem; color: var(--gray);">Page 1 of ${pdf.numPages}</span>
+                <button class="btn-secondary" onclick="navigatePage(1)">Next ▶</button>
+            `;
+            wrapper.appendChild(nav);
+        }
+        
+    } catch(err) {
+        console.error("Error loading PDF:", err);
+        displayStatus("Error loading PDF", "error");
+    }
+}
+
+/**
+ * Render a single PDF page to canvas
+ */
+async function renderPDFPage(pdf, pageNum, container) {
+    const page = await pdf.getPage(pageNum);
+    
+    // Clear previous
+    container.innerHTML = '';
+    
+    // Calculate scale based on container width
+    const containerWidth = document.getElementById('mainCanvas').clientWidth - 80;
+    const unscaledViewport = page.getViewport({ scale: 1 });
+    const scale = Math.min(containerWidth / unscaledViewport.width, 1.5);
+    const viewport = page.getViewport({ scale: scale });
+    
+    // Create canvas for PDF
+    const pdfCanvas = document.createElement('canvas');
+    pdfCanvas.id = 'pdf-page-canvas';
+    pdfCanvas.width = viewport.width;
+    pdfCanvas.height = viewport.height;
+    container.style.width = viewport.width + 'px';
+    container.style.height = viewport.height + 'px';
+    container.appendChild(pdfCanvas);
+    
+    const ctx = pdfCanvas.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+}
+
+/**
+ * Navigate between pages
+ */
+async function navigatePage(delta) {
+    const pdf = window.EDITOR_CONFIG.pdfDoc;
+    if (!pdf) return;
+    
+    let newPage = window.EDITOR_STATE.currentPage + delta;
+    newPage = Math.max(1, Math.min(newPage, pdf.numPages));
+    
+    if (newPage !== window.EDITOR_STATE.currentPage) {
+        window.EDITOR_STATE.currentPage = newPage;
+        
+        const pageContainer = document.getElementById('page-container');
+        await renderPDFPage(pdf, newPage, pageContainer);
+        
+        // Reinitialize Fabric overlay
+        setTimeout(() => {
+            if (typeof initFabricOverlay === 'function') {
+                initFabricOverlay('#page-container');
+            }
+        }, 100);
+        
+        // Update indicator
+        const indicator = document.getElementById('page-indicator');
+        if (indicator) {
+            indicator.innerText = `Page ${newPage} of ${pdf.numPages}`;
+        }
     }
 }
 
@@ -185,6 +314,7 @@ function renderGridView(container, files) {
                 </div>
             </div>
             <div class="card-actions">
+                <div class="btn-mini" onclick="previewFile(${index})" title="Preview">👁️</div>
                 <div class="btn-mini" onclick="replaceFile(${index})" title="Replace">🔄</div>
                 <div class="btn-mini btn-danger" onclick="removeFile(${index})" title="Remove">✕</div>
             </div>
@@ -394,11 +524,73 @@ function validateFile(file) {
     return true;
 }
 
-function handleToolAction(actionId) {
-    console.log("Tool action:", actionId);
-    if (actionId === 'addFile') {
-        const input = getGlobalInput(handleFileUpload);
+function handleToolAction(actionId, isTool) {
+    console.log("Tool action:", actionId, "isTool:", isTool);
+    
+    // Special handling for Image Tool (needs file input)
+    if (actionId === 'imageTool') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/png, image/jpeg, image/jpg';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (f) => {
+                if (typeof addImage === 'function') {
+                    addImage(f.target.result);
+                }
+            };
+            reader.readAsDataURL(file);
+        };
         input.click();
+        return;
+    }
+    
+    // Signature Tool
+    if (actionId === 'signatureTool') {
+        if (typeof openSignatureModal === 'function') {
+            openSignatureModal();
+        }
+        return;
+    }
+
+    // If it's a Fabric.js tool (text, draw, highlight, select)
+    if (isTool && typeof setActiveTool === 'function') {
+        setActiveTool(actionId);
+        return;
+    }
+    
+    // Standard actions
+    switch(actionId) {
+        case 'addFile':
+            const input = getGlobalInput(handleFileUpload);
+            input.click();
+            break;
+        case 'rotateLeft':
+            rotateCurrentPage(-90);
+            break;
+        case 'rotateRight':
+            rotateCurrentPage(90);
+            break;
+        case 'deletePage':
+            deleteCurrentPage();
+            break;
+        default:
+            console.log("Unknown action:", actionId);
+    }
+}
+
+// Rotate current page (for advanced mode)
+function rotateCurrentPage(angle) {
+    displayStatus(`Rotating page by ${angle}°...`, "normal");
+    // This would need backend integration for actual rotation
+    // For now, just visual feedback
+}
+
+function deleteCurrentPage() {
+    if(confirm('Delete this page?')) {
+        displayStatus("Page marked for deletion", "normal");
     }
 }
 
@@ -456,6 +648,32 @@ function replaceFile(index) {
     input.click();
 }
 
+
+
+// Preview Logic
+function previewFile(index) {
+    const file = window.EDITOR_CONFIG.files[index];
+    if (!file) return;
+    
+    const modal = document.getElementById('preview-modal');
+    const frame = document.getElementById('preview-frame');
+    
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        frame.src = file.url + "#toolbar=0"; // Minimal UI
+    } else {
+        // For images or others
+        frame.src = file.url;
+    }
+    
+    modal.style.display = 'flex';
+}
+
+function closePreview() {
+    const modal = document.getElementById('preview-modal');
+    modal.style.display = 'none';
+    document.getElementById('preview-frame').src = ''; // Stop video/iframe
+}
+
 // Page Editing Logic
 function rotatePage(pageNum, angle) {
     const card = document.querySelector(`.file-card[data-page-num="${pageNum}"]`);
@@ -511,8 +729,38 @@ function updatePageConfig(pageNum, newConfig) {
     }
 }
 
+// Zoom Logic
+function updateZoom(delta) {
+    if (!window.EDITOR_CONFIG.zoom) window.EDITOR_CONFIG.zoom = 1.0;
+    
+    let newZoom = window.EDITOR_CONFIG.zoom + delta;
+    // Clamp between 0.5 (50%) and 2.0 (200%)
+    newZoom = Math.min(Math.max(newZoom, 0.5), 2.0);
+    
+    window.EDITOR_CONFIG.zoom = newZoom;
+    
+    // Update Display
+    const display = document.getElementById('zoomLevelDisplay');
+    if (display) display.innerText = `${Math.round(newZoom * 100)}%`;
+    
+    // Apply Zoom (Standard 'zoom' works best for scrollbars on Chrome/Edge)
+    const content = document.getElementById('canvasContent');
+    if (content) {
+        // Fallback for Firefox could be transform, but for now assuming Webkit/Blink
+        content.style.zoom = newZoom;
+        // content.style.transform = `scale(${newZoom})`; // Old way
+    }
+}
+
 function setupGlobalEvents() {
     document.getElementById('processBtn').addEventListener('click', processFile);
+    
+    // Zoom Events
+    const zoomIn = document.getElementById('zoomInBtn');
+    const zoomOut = document.getElementById('zoomOutBtn');
+    
+    if(zoomIn) zoomIn.addEventListener('click', () => updateZoom(0.1));
+    if(zoomOut) zoomOut.addEventListener('click', () => updateZoom(-0.1));
 }
 
 function displayStatus(msg, type='normal') {
@@ -601,14 +849,28 @@ async function processFile() {
     btn.disabled = true;
 
     const config = window.EDITOR_CONFIG;
-    // Build payload
-    const payload = {
-        files: config.files.map(f => f.name), // Default order
-        pages_config: config.currentPageConfig || [] // For Edit PDF
-    };
-
+    const toolConfig = TOOLS[config.tool];
+    
     try {
-        const response = await fetch(`/api/process-session/${config.tool}/${config.sessionId}`, {
+        let endpoint, payload;
+        
+        // Check if we're in advanced editing mode with layers
+        if (toolConfig && toolConfig.canvasMode === 'advanced' && typeof exportLayersJSON === 'function') {
+            // Export Fabric.js layers and call editor apply API
+            const layers = exportLayersJSON();
+            endpoint = `/api/editor/apply/${config.sessionId}`;
+            payload = { layers: layers };
+            displayStatus(`Exporting ${layers.length} annotation(s)...`, "normal");
+        } else {
+            // Standard processing
+            endpoint = `/api/process-session/${config.tool}/${config.sessionId}`;
+            payload = {
+                files: config.files.map(f => f.name),
+                pages_config: config.currentPageConfig || []
+            };
+        }
+
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
