@@ -24,6 +24,7 @@ django-cors-headers>=4.3.0
 
 # Production Server
 gunicorn>=21.2.0
+whitenoise>=6.6.0
 # Database (PostgreSQL)
 psycopg2-binary>=2.9.9
 dj-database-url>=2.1.0
