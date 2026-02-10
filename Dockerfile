@@ -18,11 +18,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
-COPY requirements.txt /app/
+COPY Doc_Javelin/requirements.txt /app/
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Copy project
-COPY . /app/
+COPY Doc_Javelin/ /app/
 
 # Collect static files
 # We need SECRET_KEY for this, so we pass a dummy one if not provided, 
